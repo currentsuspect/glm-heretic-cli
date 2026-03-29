@@ -3,6 +3,7 @@ import json
 import time
 import subprocess
 import difflib
+import tomllib
 
 SESSION_DIR = ".glm/sessions"
 MAX_CONTEXT_TOKENS = 7000  # leave room for output in 8K ctx
@@ -68,23 +69,59 @@ def detect_repo_context(cwd):
             scripts = pkg.get("scripts", {})
             if scripts:
                 facts.append("npm scripts: " + ", ".join(sorted(scripts.keys())[:8]))
-            if "test" in scripts:
-                add_command("test", "npm test")
-            if "lint" in scripts:
-                add_command("lint", "npm run lint")
-            if "build" in scripts:
-                add_command("build", "npm run build")
-            if "dev" in scripts:
-                add_command("dev", "npm run dev")
-            if "start" in scripts:
-                add_command("start", "npm start")
+            package_manager = "npm"
+            if os.path.exists(os.path.join(cwd, "pnpm-lock.yaml")):
+                package_manager = "pnpm"
+            elif os.path.exists(os.path.join(cwd, "yarn.lock")):
+                package_manager = "yarn"
+            facts.append(f"package manager hint: {package_manager}")
+
+            preferred_scripts = ["test", "lint", "build", "dev", "start", "typecheck"]
+            for script in preferred_scripts:
+                if script in scripts:
+                    if package_manager == "npm":
+                        cmd = "npm test" if script == "test" else f"npm run {script}"
+                    elif package_manager == "pnpm":
+                        cmd = "pnpm test" if script == "test" else f"pnpm {script}"
+                    else:
+                        cmd = "yarn test" if script == "test" else f"yarn {script}"
+                    add_command(script, cmd)
         except Exception:
             facts.append("package.json present but could not be parsed")
 
     if os.path.exists(pyproject):
         facts.append("Python project detected via pyproject.toml")
-        add_command("test", "pytest")
-        add_command("lint", "ruff check .")
+        try:
+            with open(pyproject, "rb") as f:
+                data = tomllib.load(f)
+            project = data.get("project", {})
+            optional = project.get("optional-dependencies", {})
+            scripts = project.get("scripts", {})
+            if scripts:
+                facts.append("python scripts: " + ", ".join(sorted(scripts.keys())[:6]))
+
+            tool = data.get("tool", {})
+            if "pytest" in tool or "pytest.ini_options" in tool.get("pytest", {}):
+                add_command("test", "pytest")
+            if "ruff" in tool:
+                add_command("lint", "ruff check .")
+            if "hatch" in tool:
+                add_command("build", "python -m build")
+            if "poetry" in tool:
+                facts.append("poetry config detected")
+                add_command("install", "poetry install")
+                add_command("build", "poetry build")
+            if "setuptools" in tool:
+                facts.append("setuptools config detected")
+            if not any(cmd["label"] == "test" for cmd in commands):
+                add_command("test", "pytest")
+            if not any(cmd["label"] == "lint" for cmd in commands):
+                add_command("lint", "ruff check .")
+            if optional:
+                facts.append("optional dependency groups: " + ", ".join(sorted(optional.keys())[:6]))
+        except Exception:
+            add_command("test", "pytest")
+            add_command("lint", "ruff check .")
     elif os.path.exists(requirements):
         facts.append("Python project detected via requirements.txt")
         add_command("test", "pytest")
@@ -102,7 +139,29 @@ def detect_repo_context(cwd):
     if os.path.exists(makefile):
         facts.append("Makefile detected")
         add_command("build", "make")
-        add_command("test", "make test")
+        try:
+            with open(makefile, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+            targets = []
+            for line in lines:
+                if line.startswith("\t") or line.startswith(" "):
+                    continue
+                if ":" not in line:
+                    continue
+                target = line.split(":", 1)[0].strip()
+                if not target or "%" in target or "=" in target or target.startswith("."):
+                    continue
+                if " " in target:
+                    continue
+                targets.append(target)
+            targets = sorted(set(targets))
+            if targets:
+                facts.append("make targets: " + ", ".join(targets[:8]))
+            for label in ["test", "lint", "build", "dev", "run"]:
+                if label in targets:
+                    add_command(label, f"make {label}")
+        except Exception:
+            add_command("test", "make test")
 
     try:
         entries = sorted(name for name in os.listdir(cwd) if not name.startswith("."))[:12]
