@@ -3,6 +3,8 @@ export LD_LIBRARY_PATH=/opt/conda/lib/python3.12/site-packages/nvidia/cuda_runti
 
 if [ "$1" = "--serve" ]; then
     exec python3 /home/jovyan/glm_server.py "${@:2}"
+elif [ "$1" = "--agent" ]; then
+    exec python3 /home/jovyan/glm_agent.py "${@:2}"
 else
     exec python3 /home/jovyan/glm_chat.py "$@"
 fi
