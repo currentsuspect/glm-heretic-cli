@@ -10,6 +10,15 @@ Autonomous coding assistant powered by **GLM-4.7-Flash Heretic** (30B MoE, Q4_K_
 
 That command caches the model and drops you straight into chat mode. If the NVIDIA runtime is unavailable, it falls back to CPU automatically.
 
+## Repository Layout
+
+```text
+scripts/glm        launcher
+src/glm_cli/       chat, agent, runtime, tools, server
+README.md          usage
+AGENTS.md          repo-specific agent rules
+```
+
 ## Features
 
 - **Chat mode** — interactive conversation with thinking block separation
