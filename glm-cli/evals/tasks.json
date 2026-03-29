@@ -1,0 +1,37 @@
+[
+  {
+    "id": "exact_reply",
+    "kind": "exact",
+    "system": "You are a helpful, direct assistant.",
+    "prompt": "Reply with exactly: model eval ok",
+    "expected": "model eval ok",
+    "max_tokens": 24
+  },
+  {
+    "id": "json_tool_call",
+    "kind": "tool_call",
+    "system": "You are a terminal coding agent. If a tool is requested, output only a fenced JSON tool call using the format {\"name\":\"tool_name\",\"arguments\":{...}}.",
+    "prompt": "Output a shell tool call that runs pwd.",
+    "expected_name": "shell",
+    "expected_args": {
+      "command": "pwd"
+    },
+    "max_tokens": 80
+  },
+  {
+    "id": "no_tool_simple_answer",
+    "kind": "contains",
+    "system": "You are a helpful, direct assistant. Do not use tools unless explicitly asked.",
+    "prompt": "What color is the sky on a clear day? Answer in one short sentence.",
+    "expected_contains": "blue",
+    "max_tokens": 40
+  },
+  {
+    "id": "markdown_code_block",
+    "kind": "regex",
+    "system": "You are a helpful assistant. Use markdown when asked.",
+    "prompt": "Show a Python function named add that returns a + b.",
+    "expected_regex": "```python[\\s\\S]*def add\\(a, b\\):[\\s\\S]*return a \\+ b[\\s\\S]*```",
+    "max_tokens": 120
+  }
+]

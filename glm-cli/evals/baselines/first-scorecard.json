@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-03-29 20:41:48",
+  "backend": "GPU unavailable, falling back to CPU",
+  "model_path": "/home/jovyan/.cache/huggingface/hub/models--DavidAU--GLM-4.7-Flash-Uncensored-Heretic-NEO-CODE-Imatrix-MAX-GGUF/snapshots/af1cb75ecde13d21c19ceaa5fbd4352f8233e0e5/GLM-4.7-Flash-Uncen-Hrt-NEO-CODE-MAX-imat-D_AU-Q4_K_M.gguf",
+  "summary": {
+    "total": 2,
+    "passed": 0,
+    "failed": 2,
+    "pass_rate": 0.0
+  },
+  "results": [
+    {
+      "id": "exact_reply",
+      "kind": "exact",
+      "passed": false,
+      "detail": "expected exact `model eval ok`",
+      "response": "The user wants me to reply with a specific phrase: \"model eval ok\". This is a simple instruction to output a",
+      "elapsed_seconds": 53.4,
+      "completion_tokens": 24,
+      "prompt_tokens": 21
+    },
+    {
+      "id": "json_tool_call",
+      "kind": "tool_call",
+      "passed": false,
+      "detail": "no valid tool call parsed",
+      "response": "The user wants me to output a shell tool call that runs the `pwd` command. The `pwd` command stands for \"print working directory\" and it shows the current directory path.\n\nI need to format this as a JSON tool call. Looking at the available tools, I don't see a specific \"shell\" tool listed, but I should output a JSON format that represents a shell command execution",
+      "elapsed_seconds": 16.22,
+      "completion_tokens": 80,
+      "prompt_tokens": 50
+    }
+  ]
+}

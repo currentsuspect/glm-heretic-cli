@@ -104,6 +104,9 @@ glm --serve
 
 # local smoke loops
 ./glm-cli/scripts/test-loops
+
+# model eval scorecard
+./glm-cli/scripts/run-evals
 ```
 
 ## Requirements
