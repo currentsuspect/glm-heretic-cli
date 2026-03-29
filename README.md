@@ -16,6 +16,17 @@ Keep using the same root commands:
 ./glm --serve
 ```
 
+Current recommendation:
+
+- Best fit: local permissive coding/chat shell with strict wrapper controls enabled
+- Current shell-tuned rating: `8.2/10`
+- Main weakness: short-answer obedience can still drift into analysis on some prompts
+
+Developer docs:
+
+- `glm-cli/README.md`
+- `glm-cli/DEVELOPER_NOTES.md`
+
 Internal layout:
 
 ```text

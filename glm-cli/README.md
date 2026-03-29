@@ -33,6 +33,44 @@ glm-cli/AGENTS.md     repo-specific agent rules
 - **Stricter tool protocol** — agent mode accepts schema-valid tool calls and pushes verification after edits
 - **Risk review loop** — broad or high-impact edits must be reviewed with `git_diff` before finalizing
 
+## Recommendation
+
+- Best fit: permissive local coding/chat shell with disciplined wrapper controls
+- Use `chat` when you want freer interaction and `agent` when you want stricter tool behavior
+- Keep strict prompt modes enabled for exact-output and tool-call tasks
+- Do not treat the raw base model as fully reliable without the shell scaffolding
+
+## Model Rating
+
+Current shell-tuned recommendation:
+
+- Raw model obedience: `6.3/10`
+- Local coding/chat shell: `8.2/10`
+- Strict-format agent mode: `8.6/10`
+
+Why the rating is not higher:
+
+- the model still tends to narrate or analyze when prompts are underspecified
+- short-answer obedience remains the main visible weakness
+- the shell is carrying a meaningful part of the discipline
+
+## Eval Summary
+
+Measured saved baselines:
+
+- `first-scorecard.json`: `0/2`
+- `strict-scorecard-2case.json`: `2/2`
+- `full-scorecard-7case.json`: `6/7` = `85.7%`
+
+Main result:
+
+- strict prompt modes materially improved exact-output obedience and JSON tool-call formatting
+- the remaining failure class is simple short-answer compliance when the instruction is not explicit enough
+
+See also:
+
+- `glm-cli/DEVELOPER_NOTES.md`
+
 ## Quick Start
 
 ```bash
