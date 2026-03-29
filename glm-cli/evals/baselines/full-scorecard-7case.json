@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-03-29 21:13:11",
+  "backend": "GPU unavailable, falling back to CPU",
+  "model_path": "/home/jovyan/.cache/huggingface/hub/models--DavidAU--GLM-4.7-Flash-Uncensored-Heretic-NEO-CODE-Imatrix-MAX-GGUF/snapshots/af1cb75ecde13d21c19ceaa5fbd4352f8233e0e5/GLM-4.7-Flash-Uncen-Hrt-NEO-CODE-MAX-imat-D_AU-Q4_K_M.gguf",
+  "summary": {
+    "total": 7,
+    "passed": 6,
+    "failed": 1,
+    "pass_rate": 85.7
+  },
+  "results": [
+    {
+      "id": "exact_reply",
+      "kind": "exact",
+      "passed": true,
+      "detail": "expected exact `model eval ok`",
+      "response": "model eval ok",
+      "elapsed_seconds": 60.65,
+      "completion_tokens": 24,
+      "prompt_tokens": 70
+    },
+    {
+      "id": "json_tool_call",
+      "kind": "tool_call",
+      "passed": true,
+      "detail": "valid tool call",
+      "response": "```json\n{\"name\": \"shell\", \"arguments\": {\"command\": \"pwd\"}}\n```",
+      "elapsed_seconds": 22.26,
+      "completion_tokens": 80,
+      "prompt_tokens": 106
+    },
+    {
+      "id": "no_tool_simple_answer",
+      "kind": "contains",
+      "passed": false,
+      "detail": "expected substring `blue`",
+      "response": "1.  **Analyze the Request:**\n    *   Question: \"What color is the",
+      "elapsed_seconds": 11.1,
+      "completion_tokens": 40,
+      "prompt_tokens": 87
+    },
+    {
+      "id": "markdown_code_block",
+      "kind": "regex",
+      "passed": true,
+      "detail": "expected regex ````python[\\s\\S]*def add\\(a, b\\):[\\s\\S]*return a \\+ b[\\s\\S]*````",
+      "response": "The user wants a Python function named `add` that returns the sum of two arguments, `a` and `b`.\n\n1.  **Identify the core requirement:** Create a Python function.\n2.  **Name the function:** `add`.\n3.  **Define parameters:** `a` and `b`.\n4.  **Define the return value:** `a + b`.\n\nDrafting the code:\n```python\ndef add(a, b):\n    return a + b\n```\n\nReviewing the constraints:\n-   \"Show a Python function named add\": Done.\n-",
+      "elapsed_seconds": 16.0,
+      "completion_tokens": 120,
+      "prompt_tokens": 29
+    },
+    {
+      "id": "exact_word",
+      "kind": "exact",
+      "passed": true,
+      "detail": "expected exact `yes`",
+      "response": "yes",
+      "elapsed_seconds": 2.97,
+      "completion_tokens": 8,
+      "prompt_tokens": 65
+    },
+    {
+      "id": "git_diff_tool_call",
+      "kind": "tool_call",
+      "passed": true,
+      "detail": "valid tool call",
+      "response": "```json\n{\"name\": \"git_diff\", \"arguments\": {\"path\": \"README.md\"}}\n```",
+      "elapsed_seconds": 11.56,
+      "completion_tokens": 80,
+      "prompt_tokens": 89
+    },
+    {
+      "id": "strict_sentence",
+      "kind": "exact",
+      "passed": true,
+      "detail": "expected exact `clear skies are blue`",
+      "response": "clear skies are blue",
+      "elapsed_seconds": 4.16,
+      "completion_tokens": 16,
+      "prompt_tokens": 72
+    }
+  ]
+}

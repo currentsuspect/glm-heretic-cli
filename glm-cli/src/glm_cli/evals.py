@@ -9,7 +9,7 @@ from huggingface_hub import hf_hub_download
 
 from .agent import parse_tool_calls
 from .install import FILE, REPO
-from .prompt_modes import apply_output_contract, apply_prompt_mode
+from .prompt_modes import apply_output_contract, apply_prompt_mode, exact_output_from_prompt
 from .runtime import load_llm
 
 
@@ -39,6 +39,24 @@ def run_case(llm, case):
     elapsed = time.time() - started
     raw = output["choices"][0]["message"]["content"].strip()
     text = apply_output_contract(case["prompt"], raw, case.get("mode"))
+    if case.get("mode") == "strict_response" and exact_output_from_prompt(case["prompt"]) is None:
+        rewrite = llm.create_chat_completion(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Answer the user's question directly. Output only the final answer. No explanation. No bullets. No markdown. One short sentence.",
+                },
+                {
+                    "role": "user",
+                    "content": case["prompt"],
+                },
+            ],
+            max_tokens=20,
+            temperature=0.0,
+            top_p=0.9,
+            stop=["<|endoftext|>"],
+        )
+        text = rewrite["choices"][0]["message"]["content"].strip()
     passed, detail = score_case(case, text)
     return {
         "id": case["id"],

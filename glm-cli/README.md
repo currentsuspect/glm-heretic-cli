@@ -107,6 +107,9 @@ glm --serve
 
 # model eval scorecard
 ./glm-cli/scripts/run-evals
+
+# compare latest report to baseline
+./glm-cli/scripts/compare-evals
 ```
 
 ## Requirements

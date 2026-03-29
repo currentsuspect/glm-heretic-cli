@@ -5,7 +5,7 @@ import time
 import readline
 from huggingface_hub import hf_hub_download
 from .context import detect_repo_context
-from .prompt_modes import apply_output_contract, apply_prompt_mode, detect_prompt_mode
+from .prompt_modes import apply_output_contract, apply_prompt_mode, detect_prompt_mode, exact_output_from_prompt
 from .runtime import load_llm
 
 REPO = "DavidAU/GLM-4.7-Flash-Uncensored-Heretic-NEO-CODE-Imatrix-MAX-GGUF"
@@ -211,6 +211,24 @@ def chat_with_mode(llm, messages, user_text, mode, temperature=0.7):
 
     raw = output["choices"][0]["message"]["content"]
     final = apply_output_contract(user_text, raw, mode)
+    if mode == "strict_response" and exact_output_from_prompt(user_text) is None:
+        rewrite = llm.create_chat_completion(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Answer the user's question directly. Output only the final answer. No explanation. No bullets. No markdown. One short sentence.",
+                },
+                {
+                    "role": "user",
+                    "content": user_text,
+                },
+            ],
+            max_tokens=20,
+            temperature=0.0,
+            top_p=0.9,
+            stop=["<|endoftext|>"],
+        )
+        final = rewrite["choices"][0]["message"]["content"].strip()
     render(final)
     usage = output["usage"]
     print(f"\n  {GRAY}└ {usage['completion_tokens']} tokens · {usage['prompt_tokens']} prompt{R}\n")
