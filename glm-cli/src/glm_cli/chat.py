@@ -5,6 +5,7 @@ import time
 import readline
 from huggingface_hub import hf_hub_download
 from .context import detect_repo_context
+from .prompt_modes import apply_output_contract, apply_prompt_mode, detect_prompt_mode
 from .runtime import load_llm
 
 REPO = "DavidAU/GLM-4.7-Flash-Uncensored-Heretic-NEO-CODE-Imatrix-MAX-GGUF"
@@ -193,6 +194,29 @@ def chat(llm, messages, max_tokens=1024, temperature=0.7):
     return resp
 
 
+def chat_with_mode(llm, messages, user_text, mode, temperature=0.7):
+    spin = spinner("Thinking...")
+    sys.stdout.write(next(spin))
+    sys.stdout.flush()
+
+    output = llm.create_chat_completion(
+        messages=messages,
+        max_tokens=1024,
+        temperature=temperature,
+        top_p=0.9,
+        stop=["<|endoftext|>"],
+    )
+
+    clear_line()
+
+    raw = output["choices"][0]["message"]["content"]
+    final = apply_output_contract(user_text, raw, mode)
+    render(final)
+    usage = output["usage"]
+    print(f"\n  {GRAY}└ {usage['completion_tokens']} tokens · {usage['prompt_tokens']} prompt{R}\n")
+    return final
+
+
 def main():
     flags = sys.argv[1:]
     prompt_args = []
@@ -237,12 +261,14 @@ def main():
     system = system_override if system_override is not None else \
         "You are a helpful, direct assistant. Give concise, clear answers."
 
-    messages = [{"role": "system", "content": system}]
-
     if one_shot:
+        mode = detect_prompt_mode(one_shot)
+        messages = [{"role": "system", "content": apply_prompt_mode(system, mode)}]
         messages.append({"role": "user", "content": one_shot})
-        chat(llm, messages, temperature=temperature)
+        chat_with_mode(llm, messages, one_shot, mode, temperature=temperature)
         return
+
+    messages = [{"role": "system", "content": system}]
 
     # interactive
     render_panel(
@@ -292,8 +318,17 @@ def main():
 """)
             continue
 
-        messages.append({"role": "user", "content": user})
-        resp = chat(llm, messages, temperature=temperature)
+        mode = detect_prompt_mode(user)
+        if mode:
+            temp_messages = messages + [
+                {"role": "system", "content": apply_prompt_mode(system, mode)},
+                {"role": "user", "content": user},
+            ]
+            resp = chat_with_mode(llm, temp_messages, user, mode, temperature=temperature)
+            messages.append({"role": "user", "content": user})
+        else:
+            messages.append({"role": "user", "content": user})
+            resp = chat(llm, messages, temperature=temperature)
         messages.append({"role": "assistant", "content": resp})
 
 

@@ -2,6 +2,7 @@
   {
     "id": "exact_reply",
     "kind": "exact",
+    "mode": "strict_response",
     "system": "You are a helpful, direct assistant.",
     "prompt": "Reply with exactly: model eval ok",
     "expected": "model eval ok",
@@ -10,6 +11,7 @@
   {
     "id": "json_tool_call",
     "kind": "tool_call",
+    "mode": "strict_tool",
     "system": "You are a terminal coding agent. If a tool is requested, output only a fenced JSON tool call using the format {\"name\":\"tool_name\",\"arguments\":{...}}.",
     "prompt": "Output a shell tool call that runs pwd.",
     "expected_name": "shell",
@@ -21,6 +23,7 @@
   {
     "id": "no_tool_simple_answer",
     "kind": "contains",
+    "mode": "strict_response",
     "system": "You are a helpful, direct assistant. Do not use tools unless explicitly asked.",
     "prompt": "What color is the sky on a clear day? Answer in one short sentence.",
     "expected_contains": "blue",
@@ -33,5 +36,35 @@
     "prompt": "Show a Python function named add that returns a + b.",
     "expected_regex": "```python[\\s\\S]*def add\\(a, b\\):[\\s\\S]*return a \\+ b[\\s\\S]*```",
     "max_tokens": 120
+  },
+  {
+    "id": "exact_word",
+    "kind": "exact",
+    "mode": "strict_response",
+    "system": "You are a helpful assistant.",
+    "prompt": "Output only: yes",
+    "expected": "yes",
+    "max_tokens": 8
+  },
+  {
+    "id": "git_diff_tool_call",
+    "kind": "tool_call",
+    "mode": "strict_tool",
+    "system": "You are a terminal coding agent. Output only a fenced JSON tool call when asked.",
+    "prompt": "Output a git_diff tool call for README.md.",
+    "expected_name": "git_diff",
+    "expected_args": {
+      "path": "README.md"
+    },
+    "max_tokens": 80
+  },
+  {
+    "id": "strict_sentence",
+    "kind": "exact",
+    "mode": "strict_response",
+    "system": "You are a concise assistant.",
+    "prompt": "Answer in one short sentence exactly: clear skies are blue",
+    "expected": "clear skies are blue",
+    "max_tokens": 16
   }
 ]

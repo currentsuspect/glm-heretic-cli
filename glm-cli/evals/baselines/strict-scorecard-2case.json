@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-03-29 20:55:02",
+  "backend": "GPU unavailable, falling back to CPU",
+  "model_path": "/home/jovyan/.cache/huggingface/hub/models--DavidAU--GLM-4.7-Flash-Uncensored-Heretic-NEO-CODE-Imatrix-MAX-GGUF/snapshots/af1cb75ecde13d21c19ceaa5fbd4352f8233e0e5/GLM-4.7-Flash-Uncen-Hrt-NEO-CODE-MAX-imat-D_AU-Q4_K_M.gguf",
+  "summary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "pass_rate": 100.0
+  },
+  "results": [
+    {
+      "id": "exact_reply",
+      "kind": "exact",
+      "passed": true,
+      "detail": "expected exact `model eval ok`",
+      "response": "model eval ok",
+      "elapsed_seconds": 61.53,
+      "completion_tokens": 24,
+      "prompt_tokens": 70
+    },
+    {
+      "id": "json_tool_call",
+      "kind": "tool_call",
+      "passed": true,
+      "detail": "valid tool call",
+      "response": "```json\n{\"name\": \"shell\", \"arguments\": {\"command\": \"pwd\"}}\n```",
+      "elapsed_seconds": 33.68,
+      "completion_tokens": 80,
+      "prompt_tokens": 106
+    }
+  ]
+}

@@ -9,6 +9,7 @@ from huggingface_hub import hf_hub_download
 
 from .agent import parse_tool_calls
 from .install import FILE, REPO
+from .prompt_modes import apply_output_contract, apply_prompt_mode
 from .runtime import load_llm
 
 
@@ -24,9 +25,10 @@ def load_tasks():
 
 def run_case(llm, case):
     started = time.time()
+    system_text = apply_prompt_mode(case["system"], case.get("mode"))
     output = llm.create_chat_completion(
         messages=[
-            {"role": "system", "content": case["system"]},
+            {"role": "system", "content": system_text},
             {"role": "user", "content": case["prompt"]},
         ],
         max_tokens=case.get("max_tokens", 128),
@@ -35,7 +37,8 @@ def run_case(llm, case):
         stop=["<|endoftext|>"],
     )
     elapsed = time.time() - started
-    text = output["choices"][0]["message"]["content"].strip()
+    raw = output["choices"][0]["message"]["content"].strip()
+    text = apply_output_contract(case["prompt"], raw, case.get("mode"))
     passed, detail = score_case(case, text)
     return {
         "id": case["id"],
