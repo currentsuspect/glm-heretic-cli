@@ -30,6 +30,7 @@ glm-cli/AGENTS.md     repo-specific agent rules
 - **Repo-level guidance** — `AGENTS.md` instructions are injected into agent mode
 - **Repo bootstrap detection** — agent/chat surfaces likely test/build commands from the current workspace
 - **Backend fallback** — automatically uses CPU when NVIDIA runtime is unavailable
+- **Stricter tool protocol** — agent mode accepts schema-valid tool calls and pushes verification after edits
 
 ## Quick Start
 

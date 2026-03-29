@@ -33,6 +33,17 @@ MAX_TOKENS = 4096
 SESSION_ID = None
 
 
+def tool_required_fields():
+    required = {}
+    for name, spec in TOOLS.items():
+        params = spec["schema"].get("parameters", {})
+        required[name] = set(params.get("required", []))
+    return required
+
+
+TOOL_REQUIRED_FIELDS = tool_required_fields()
+
+
 def clear_line():
     sys.stdout.write("\r\033[K")
     sys.stdout.flush()
@@ -115,6 +126,9 @@ def update_execution_state(state, name, args, result):
         state["made_changes"] = True
         return
 
+    if name in {"git_diff", "git_status"}:
+        return
+
     if name != "shell":
         return
 
@@ -168,23 +182,66 @@ def load_model():
     return llm
 
 
+def extract_json_objects(text):
+    objects = []
+    decoder = json.JSONDecoder()
+    idx = 0
+    while idx < len(text):
+        if text[idx] != "{":
+            idx += 1
+            continue
+        try:
+            obj, end = decoder.raw_decode(text[idx:])
+        except json.JSONDecodeError:
+            idx += 1
+            continue
+        if isinstance(obj, dict):
+            objects.append(obj)
+        idx += end
+    return objects
+
+
+def validate_tool_call(obj):
+    if not isinstance(obj, dict):
+        return None
+    name = obj.get("name")
+    arguments = obj.get("arguments")
+    if not isinstance(name, str) or not isinstance(arguments, dict):
+        return None
+    if name not in TOOLS:
+        return None
+    missing = TOOL_REQUIRED_FIELDS.get(name, set()) - set(arguments.keys())
+    if missing:
+        return None
+    return {"name": name, "arguments": arguments}
+
+
 def parse_tool_calls(text):
     calls = []
-    for m in re.finditer(r'```json\s*(\{[^`]*?\})\s*```', text, re.DOTALL):
-        try:
-            obj = json.loads(m.group(1))
-            if "name" in obj and "arguments" in obj:
-                calls.append(obj)
-        except json.JSONDecodeError:
-            pass
-    if not calls:
-        for m in re.finditer(r'\{[^{}]*"name"\s*:\s*"[^"]*"[^{}]*"arguments"\s*:\s*\{[^}]*\}[^{}]*\}', text):
-            try:
-                obj = json.loads(m.group(0))
-                if "name" in obj and "arguments" in obj:
-                    calls.append(obj)
-            except json.JSONDecodeError:
-                pass
+    seen = set()
+
+    fenced_matches = re.findall(r"```json\s*([\s\S]*?)```", text, re.DOTALL)
+    for block in fenced_matches:
+        for obj in extract_json_objects(block):
+            call = validate_tool_call(obj)
+            if call is None:
+                continue
+            key = json.dumps(call, sort_keys=True)
+            if key not in seen:
+                seen.add(key)
+                calls.append(call)
+
+    if calls:
+        return calls
+
+    for obj in extract_json_objects(text):
+        call = validate_tool_call(obj)
+        if call is None:
+            continue
+        key = json.dumps(call, sort_keys=True)
+        if key not in seen:
+            seen.add(key)
+            calls.append(call)
     return calls
 
 
@@ -211,7 +268,9 @@ def render_thinking(text):
 
 def clean_answer(text):
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    text = re.sub(r'```json\s*\{[^`]*?\}\s*```', '', text, flags=re.DOTALL)
+    text = re.sub(r'```json\s*[\s\S]*?```', '', text, flags=re.DOTALL)
+    for call in parse_tool_calls(text):
+        text = text.replace(json.dumps(call), "")
     return text.strip()
 
 
@@ -415,13 +474,13 @@ Your job is to complete the user's task end-to-end using the available tools. Th
 
 ## Tool Call Format
 
-To call a tool, output a JSON block like this:
+To call a tool, output a fenced JSON block like this:
 
 ```json
 {"name": "tool_name", "arguments": {"key": "value"}}
 ```
 
-You may call multiple tools in sequence. Prefer acting over discussing when tools can answer the question.
+Only emit valid tool names and arguments that match the tool schema. You may call multiple tools in sequence. Prefer acting over discussing when tools can answer the question.
 
 ## Tool Discipline
 
@@ -443,6 +502,7 @@ You may call multiple tools in sequence. Prefer acting over discussing when tool
 - Keep diffs focused and readable.
 - If a command or edit fails, explain it briefly and try the next reasonable step.
 - If verification fails, continue working unless blocked.
+- If you make changes, do not finalize until you have run a relevant verification step or clearly explained why verification is unavailable.
 
 ## Communication Rules
 
