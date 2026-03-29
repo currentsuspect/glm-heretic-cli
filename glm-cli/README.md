@@ -26,7 +26,7 @@ glm-cli/AGENTS.md     repo-specific agent rules
 - **Chat mode** — interactive conversation with thinking block separation
 - **Agent mode** — autonomous tool-using coding assistant
 - **API server** — OpenAI-compatible endpoint
-- **11 built-in tools**: shell, read, write, edit, glob, grep, web_search, web_fetch, memory, git_status, git_diff
+- **12 built-in tools**: shell, read, write, edit, patch, glob, grep, web_search, web_fetch, memory, git_status, git_diff
 - **Repo-level guidance** — `AGENTS.md` instructions are injected into agent mode
 - **Repo bootstrap detection** — agent/chat surfaces likely test/build commands from the current workspace
 - **Backend fallback** — automatically uses CPU when NVIDIA runtime is unavailable
@@ -65,6 +65,7 @@ glm --serve
 | `read` | Read file contents (offset/limit) |
 | `write` | Create/overwrite files |
 | `edit` | Find and replace in files |
+| `patch` | Apply multiple structured edits to one file and return a diff |
 | `glob` | Find files by pattern |
 | `grep` | Search file contents (ripgrep) |
 | `web_search` | DuckDuckGo search |

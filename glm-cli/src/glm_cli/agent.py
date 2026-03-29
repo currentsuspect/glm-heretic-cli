@@ -122,7 +122,7 @@ def verification_hint(cwd):
 
 
 def update_execution_state(state, name, args, result):
-    if name in {"edit", "write"}:
+    if name in {"edit", "write", "patch"}:
         state["made_changes"] = True
         return
 
@@ -488,6 +488,7 @@ Only emit valid tool names and arguments that match the tool schema. You may cal
 - Prefer `glob` and `grep` for discovery.
 - Use `read` with `offset` and `limit` for large files.
 - Use `edit` for targeted replacements.
+- Use `patch` for multi-step edits to one file when one replacement is not enough.
 - Use `write` for intentional file creation or full replacement.
 - Use `shell` for inspection, tests, formatting, and builds.
 - Use `git_status` before risky edits when the repo may already be dirty.

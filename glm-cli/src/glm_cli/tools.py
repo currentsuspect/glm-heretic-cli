@@ -193,6 +193,86 @@ def tool_edit(args):
         return f"Error: {e}"
 
 
+# ── patch ──────────────────────────────────────────────────────────────
+
+def tool_patch(args):
+    path = args.get("path", "")
+    operations = args.get("operations", [])
+    if not path or not isinstance(operations, list) or not operations:
+        return "Error: path and non-empty operations are required"
+
+    full = os.path.join(WORKDIR, path) if not os.path.isabs(path) else path
+    if not os.path.exists(full):
+        return f"Error: file not found: {path}"
+
+    try:
+        with open(full, "r", errors="replace") as f:
+            original = f.read()
+        content = original
+
+        for i, op in enumerate(operations, start=1):
+            if not isinstance(op, dict):
+                return f"Error: operation {i} must be an object"
+
+            op_name = op.get("op")
+            if op_name == "replace":
+                old = op.get("old_string", "")
+                new = op.get("new_string", "")
+                if not old:
+                    return f"Error: operation {i} replace requires old_string"
+                count = content.count(old)
+                if count == 0:
+                    return f"Error: operation {i} old_string not found"
+                if count > 1:
+                    return f"Error: operation {i} old_string found {count} times; make it unique"
+                content = content.replace(old, new, 1)
+            elif op_name == "insert_after":
+                anchor = op.get("anchor", "")
+                text = op.get("text", "")
+                if not anchor:
+                    return f"Error: operation {i} insert_after requires anchor"
+                count = content.count(anchor)
+                if count == 0:
+                    return f"Error: operation {i} anchor not found"
+                if count > 1:
+                    return f"Error: operation {i} anchor found {count} times; make it unique"
+                content = content.replace(anchor, anchor + text, 1)
+            elif op_name == "insert_before":
+                anchor = op.get("anchor", "")
+                text = op.get("text", "")
+                if not anchor:
+                    return f"Error: operation {i} insert_before requires anchor"
+                count = content.count(anchor)
+                if count == 0:
+                    return f"Error: operation {i} anchor not found"
+                if count > 1:
+                    return f"Error: operation {i} anchor found {count} times; make it unique"
+                content = content.replace(anchor, text + anchor, 1)
+            elif op_name == "delete":
+                old = op.get("old_string", "")
+                if not old:
+                    return f"Error: operation {i} delete requires old_string"
+                count = content.count(old)
+                if count == 0:
+                    return f"Error: operation {i} old_string not found"
+                if count > 1:
+                    return f"Error: operation {i} old_string found {count} times; make it unique"
+                content = content.replace(old, "", 1)
+            else:
+                return f"Error: operation {i} has unsupported op '{op_name}'"
+
+        if content == original:
+            return "No changes applied"
+
+        with open(full, "w") as f:
+            f.write(content)
+
+        diff = make_diff(path, original, content)
+        return truncate(diff or f"Patched {path}")
+    except Exception as e:
+        return f"Error: {e}"
+
+
 # ── glob ───────────────────────────────────────────────────────────────
 
 def tool_glob(args):
@@ -425,6 +505,38 @@ TOOLS = {
                     "new_string": {"type": "string", "description": "Replacement text"},
                 },
                 "required": ["path", "old_string", "new_string"],
+            },
+        },
+    },
+    "patch": {
+        "fn": tool_patch,
+        "schema": {
+            "name": "patch",
+            "description": "Apply multiple structured edits to one file and return a unified diff.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path"},
+                    "operations": {
+                        "type": "array",
+                        "description": "Ordered edit operations",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "op": {
+                                    "type": "string",
+                                    "enum": ["replace", "insert_after", "insert_before", "delete"],
+                                },
+                                "old_string": {"type": "string", "description": "Target text for replace/delete"},
+                                "new_string": {"type": "string", "description": "Replacement text for replace"},
+                                "anchor": {"type": "string", "description": "Anchor text for insert_before/insert_after"},
+                                "text": {"type": "string", "description": "Text to insert"},
+                            },
+                            "required": ["op"],
+                        },
+                    },
+                },
+                "required": ["path", "operations"],
             },
         },
     },
