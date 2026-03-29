@@ -1,9 +1,8 @@
-from llama_cpp import Llama
 from huggingface_hub import hf_hub_download
 import time
-from glm_runtime import load_llm
+from .runtime import load_llm
 
-REPO = "DavidAU/GLM-4.7-Flash-Uncensored-Heretic-NEO-CODE-Imatrix-MAX-GGUF"
+REPO = ""
 FILE = "GLM-4.7-Flash-Uncen-Hrt-NEO-CODE-MAX-imat-D_AU-Q4_K_M.gguf"
 
 print(f"Downloading {FILE} from {REPO}...")

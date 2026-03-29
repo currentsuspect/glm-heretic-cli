@@ -56,6 +56,80 @@ def render_panel(title, lines, accent=CYAN):
     print()
 
 
+def build_execution_plan(user_msg, cwd):
+    repo = detect_repo_context(cwd)
+    verify_cmd = None
+    for item in repo["commands"]:
+        if item["label"] == "test":
+            verify_cmd = item["command"]
+            break
+    if verify_cmd is None and repo["commands"]:
+        verify_cmd = repo["commands"][0]["command"]
+
+    lowered = user_msg.lower()
+    change_words = ("fix", "change", "edit", "update", "create", "implement", "refactor", "add")
+    needs_change = any(word in lowered for word in change_words)
+
+    steps = [
+        "Inspect repo state and locate the relevant files.",
+        "Read the target code before making changes.",
+    ]
+    if needs_change:
+        steps.append("Make the smallest correct change that solves the task.")
+    else:
+        steps.append("Gather evidence and answer directly if no change is needed.")
+    if verify_cmd:
+        steps.append(f"Verify the result with `{verify_cmd}` or a targeted check.")
+    else:
+        steps.append("Review the resulting diff or run a targeted shell check before finishing.")
+    return steps
+
+
+def show_plan_panel(user_msg, cwd):
+    steps = build_execution_plan(user_msg, cwd)
+    lines = [f"task: {user_msg}"]
+    lines.extend(f"{i + 1}. {step}" for i, step in enumerate(steps))
+    render_panel("Plan", lines, accent=YELLOW)
+
+
+def create_execution_state():
+    return {
+        "made_changes": False,
+        "verified": False,
+        "verification_prompted": False,
+    }
+
+
+def verification_hint(cwd):
+    repo = detect_repo_context(cwd)
+    for item in repo["commands"]:
+        if item["label"] == "test":
+            return f"Run `{item['command']}` before finalizing."
+    if repo["commands"]:
+        return f"Run `{repo['commands'][0]['command']}` or another targeted check before finalizing."
+    return "Run a relevant shell check or inspect the diff before finalizing."
+
+
+def update_execution_state(state, name, args, result):
+    if name in {"edit", "write"}:
+        state["made_changes"] = True
+        return
+
+    if name != "shell":
+        return
+
+    cmd = args.get("command", "").lower()
+    if any(token in cmd for token in [
+        "pytest", "npm test", "ruff check", "make test", "cargo test",
+        "go test", "npm run lint", "npm run build", "cargo build", "go build",
+    ]):
+        if "[exit code:" not in result:
+            state["verified"] = True
+
+    if any(token in cmd for token in ["mkdir", "touch", "cp ", "mv ", "npm install", "pip install"]):
+        state["made_changes"] = True
+
+
 def load_model():
     sys.stderr.write(f"\n  {B}{CYAN}GLM-Agent{R} {D}· {len(TOOLS)} tools{R}\n")
     sys.stderr.write(f"  {D}30B MoE · 16K ctx · auto-compact · git-aware · repo-bootstrap{R}\n\n")
@@ -222,7 +296,15 @@ def auto_save(messages):
 
 
 def agent_loop(llm, user_msg, messages, temperature=0.7):
+    state = create_execution_state()
+    show_plan_panel(user_msg, os.getcwd())
     messages.append({"role": "user", "content": user_msg})
+    messages.append({
+        "role": "system",
+        "content": "Execution plan:\n" + "\n".join(
+            f"{i + 1}. {step}" for i, step in enumerate(build_execution_plan(user_msg, os.getcwd()))
+        ),
+    })
 
     for turn in range(MAX_TURNS):
         # compact if needed
@@ -251,6 +333,15 @@ def agent_loop(llm, user_msg, messages, temperature=0.7):
         calls = parse_tool_calls(resp)
 
         if not calls:
+            if state["made_changes"] and not state["verified"] and not state["verification_prompted"]:
+                render_panel("Verify", [verification_hint(os.getcwd())], accent=RED)
+                messages.append({"role": "assistant", "content": resp})
+                messages.append({
+                    "role": "user",
+                    "content": "You have made changes but have not verified them yet. Run a relevant verification step before giving the final answer.",
+                })
+                state["verification_prompted"] = True
+                continue
             render_answer(resp)
             messages.append({"role": "assistant", "content": resp})
             print(f"  {GRAY}└ {usage['completion_tokens']} tok · {elapsed:.1f}s · {usage['completion_tokens']/elapsed:.0f} tok/s{R}\n")
@@ -276,6 +367,8 @@ def agent_loop(llm, user_msg, messages, temperature=0.7):
             for line in result.split("\n"):
                 print(f"  {GRAY}│{R} {line}")
             print(f"  {D}{'─' * 56}{R}\n")
+
+            update_execution_state(state, name, args, result)
 
             messages.append({
                 "role": "user",
@@ -445,6 +538,7 @@ def main():
     reset                           clear history
     /system <text>                  append to system prompt
     /tools                          list available tools
+    /repo                           show detected repo info
     /ctx                            show context usage
     /sessions                       list saved sessions
 """)

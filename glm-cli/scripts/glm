@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 export LD_LIBRARY_PATH=/opt/conda/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cublas/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cudnn/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cuda_cupti/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cufft/lib:/opt/conda/lib/python3.12/site-packages/nvidia/curand/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cusolver/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cusparse/lib:/opt/conda/lib/python3.12/site-packages/nvidia/nccl/lib:${LD_LIBRARY_PATH:-}
 
