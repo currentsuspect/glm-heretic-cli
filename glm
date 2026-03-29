@@ -1,0 +1,8 @@
+#!/bin/bash
+export LD_LIBRARY_PATH=/opt/conda/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cublas/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cudnn/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cuda_cupti/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cufft/lib:/opt/conda/lib/python3.12/site-packages/nvidia/curand/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cusolver/lib:/opt/conda/lib/python3.12/site-packages/nvidia/cusparse/lib:/opt/conda/lib/python3.12/site-packages/nvidia/nccl/lib:$LD_LIBRARY_PATH
+
+if [ "$1" = "--serve" ]; then
+    exec python3 /home/jovyan/glm_server.py "${@:2}"
+else
+    exec python3 /home/jovyan/glm_chat.py "$@"
+fi
