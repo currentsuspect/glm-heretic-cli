@@ -108,6 +108,9 @@ def create_execution_state():
         "made_changes": False,
         "verified": False,
         "verification_prompted": False,
+        "risky_paths": set(),
+        "reviewed_paths": set(),
+        "review_prompted": False,
     }
 
 
@@ -121,12 +124,64 @@ def verification_hint(cwd):
     return "Run a relevant shell check or inspect the diff before finalizing."
 
 
+def review_hint(state):
+    if not state["risky_paths"]:
+        return "Review the diff for the risky changes before finalizing."
+    paths = ", ".join(sorted(state["risky_paths"]))
+    return f"Review risky changes with `git_diff` for: {paths}"
+
+
+def is_risky_path(path):
+    risky_names = {
+        "package.json", "pyproject.toml", "requirements.txt", "Makefile",
+        "Dockerfile", "docker-compose.yml", ".gitignore", "README.md",
+        "AGENTS.md", "glm", "scripts/glm",
+    }
+    normalized = path.replace("\\", "/")
+    base = os.path.basename(normalized)
+    if base in risky_names:
+        return True
+    if normalized.endswith((".yml", ".yaml", ".toml", ".json")) and ("/.github/" in normalized or normalized.startswith(".github/")):
+        return True
+    return False
+
+
+def detect_risky_change(name, args):
+    path = args.get("path", "")
+    if name == "write":
+        content = args.get("content", "")
+        if is_risky_path(path) or len(content) > 2000 or content.count("\n") > 80:
+            return path
+    elif name == "patch":
+        operations = args.get("operations", [])
+        if is_risky_path(path) or len(operations) >= 3:
+            return path
+    elif name == "edit":
+        old = args.get("old_string", "")
+        new = args.get("new_string", "")
+        changed_lines = max(old.count("\n"), new.count("\n")) + 1
+        if is_risky_path(path) or changed_lines > 20:
+            return path
+    return None
+
+
 def update_execution_state(state, name, args, result):
     if name in {"edit", "write", "patch"}:
         state["made_changes"] = True
+        risky_path = detect_risky_change(name, args)
+        if risky_path:
+            state["risky_paths"].add(risky_path)
         return
 
-    if name in {"git_diff", "git_status"}:
+    if name == "git_diff":
+        path = args.get("path")
+        if path:
+            state["reviewed_paths"].add(path)
+        else:
+            state["reviewed_paths"].update(state["risky_paths"])
+        return
+
+    if name == "git_status":
         return
 
     if name != "shell":
@@ -392,6 +447,16 @@ def agent_loop(llm, user_msg, messages, temperature=0.7):
         calls = parse_tool_calls(resp)
 
         if not calls:
+            unreviewed_risky = state["risky_paths"] - state["reviewed_paths"]
+            if unreviewed_risky and not state["review_prompted"]:
+                render_panel("Review", [review_hint(state)], accent=RED)
+                messages.append({"role": "assistant", "content": resp})
+                messages.append({
+                    "role": "user",
+                    "content": "You made risky changes. Review them with git_diff before giving the final answer.",
+                })
+                state["review_prompted"] = True
+                continue
             if state["made_changes"] and not state["verified"] and not state["verification_prompted"]:
                 render_panel("Verify", [verification_hint(os.getcwd())], accent=RED)
                 messages.append({"role": "assistant", "content": resp})
@@ -504,6 +569,7 @@ Only emit valid tool names and arguments that match the tool schema. You may cal
 - If a command or edit fails, explain it briefly and try the next reasonable step.
 - If verification fails, continue working unless blocked.
 - If you make changes, do not finalize until you have run a relevant verification step or clearly explained why verification is unavailable.
+- If you make risky changes to broad content or key config files, review them with `git_diff` before finalizing.
 
 ## Communication Rules
 

@@ -31,6 +31,7 @@ glm-cli/AGENTS.md     repo-specific agent rules
 - **Repo bootstrap detection** — agent/chat surfaces likely test/build commands from the current workspace
 - **Backend fallback** — automatically uses CPU when NVIDIA runtime is unavailable
 - **Stricter tool protocol** — agent mode accepts schema-valid tool calls and pushes verification after edits
+- **Risk review loop** — broad or high-impact edits must be reviewed with `git_diff` before finalizing
 
 ## Quick Start
 
