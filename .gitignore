@@ -2,3 +2,11 @@ __pycache__/
 *.pyc
 .cache/
 *.egg-info/
+.glm/
+.venv/
+.ipynb_checkpoints/
+node_modules/
+bin/
+lib/
+ollama.tgz
+.ollama/

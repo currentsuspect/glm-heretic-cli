@@ -3,14 +3,15 @@ from huggingface_hub import hf_hub_download
 import json
 import re
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from glm_runtime import load_llm
 
 REPO = "DavidAU/GLM-4.7-Flash-Uncensored-Heretic-NEO-CODE-Imatrix-MAX-GGUF"
 FILE = "GLM-4.7-Flash-Uncen-Hrt-NEO-CODE-MAX-imat-D_AU-Q4_K_M.gguf"
 
 print("Loading model...")
 model_path = hf_hub_download(repo_id=REPO, filename=FILE)
-llm = Llama(model_path=model_path, n_ctx=4096, n_gpu_layers=-1, verbose=False)
-print("Model loaded.")
+llm, backend_note = load_llm(model_path=model_path, n_ctx=4096, verbose=False)
+print(f"Model loaded. {backend_note}")
 
 def strip_thinking(text):
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()

@@ -6,15 +6,78 @@ import glob as globmod
 import urllib.request
 import urllib.parse
 import shlex
+import difflib
 
 WORKDIR = os.getcwd()
 MAX_OUTPUT = 4000
+SAFE_MODE = True  # require confirmation for destructive ops
 
 
 def truncate(text, limit=MAX_OUTPUT):
     if len(text) <= limit:
         return text
     return text[:limit] + f"\n... ({len(text) - limit} chars truncated)"
+
+
+def confirm(prompt):
+    if not SAFE_MODE:
+        return True
+    try:
+        resp = input(f"  {prompt} [y/N] ").strip().lower()
+        return resp in ("y", "yes")
+    except (EOFError, KeyboardInterrupt):
+        return False
+
+
+def classify_shell_command(cmd):
+    lowered = cmd.lower()
+    block_patterns = [
+        "rm -rf /", "mkfs", "dd if=", "shutdown", "reboot",
+        "poweroff", "halt", "git reset --hard", "git clean -fd",
+        ":(){:|:&};:", "chmod -r 777 /", "chown -r /",
+    ]
+    caution_patterns = [
+        "rm ", "mv ", "cp ", "curl ", "wget ", "pip install",
+        "npm install", "npm i ", "pnpm add", "yarn add",
+        "git checkout ", "git switch ", "git restore ",
+        "docker ", "sudo ", "python -m pip",
+    ]
+
+    for pattern in block_patterns:
+        if pattern in lowered:
+            return "blocked", f"blocked destructive pattern: {pattern}"
+
+    if re.search(r"\brm\s+-[^\n]*[rf][^\n]*\s+(\.|/|\.\.)", lowered):
+        return "blocked", "blocked recursive delete command"
+    if re.search(r"\bmv\s+.+\s+/dev/null\b", lowered):
+        return "blocked", "blocked destructive move"
+    if re.search(r"\bchmod\s+-r\b", lowered):
+        return "caution", "recursive permission change"
+
+    for pattern in caution_patterns:
+        if pattern in lowered:
+            return "caution", f"state-changing command: {pattern.strip()}"
+
+    return "safe", "read-only or low-risk command"
+
+
+def make_diff(path, old_content, new_content):
+    old_lines = old_content.splitlines(keepends=True)
+    new_lines = new_content.splitlines(keepends=True)
+    diff = list(difflib.unified_diff(old_lines, new_lines, fromfile=f"a/{path}", tofile=f"b/{path}"))
+    return "".join(diff)
+
+
+# ANSI for tool display
+R = "\033[0m"
+B = "\033[1m"
+D = "\033[2m"
+GRAY = "\033[90m"
+GREEN = "\033[32m"
+RED = "\033[31m"
+CYAN = "\033[36m"
+YELLOW = "\033[33m"
+WHITE = "\033[97m"
 
 
 # ── shell ──────────────────────────────────────────────────────────────
@@ -24,12 +87,26 @@ def tool_shell(args):
     if not cmd:
         return "Error: no command provided"
     timeout = min(args.get("timeout", 30), 120)
+    confirm_dangerous = args.get("confirm_dangerous", False)
+    risk, reason = classify_shell_command(cmd)
+
+    if risk == "blocked":
+        return (
+            "[blocked]\n"
+            f"Command was not run because it looks destructive: {reason}\n"
+            "If the user explicitly wants this, rerun with confirm_dangerous=true."
+        )
+
+    if risk == "caution" and confirm_dangerous:
+        if not confirm(f"Run caution command? {cmd}"):
+            return "[cancelled]\nUser declined to run the caution command."
+
     try:
         r = subprocess.run(
             cmd, shell=True, capture_output=True, text=True,
             timeout=timeout, cwd=WORKDIR,
         )
-        out = ""
+        out = f"[risk: {risk}] {reason}\n"
         if r.stdout:
             out += r.stdout
         if r.stderr:
@@ -236,6 +313,55 @@ def tool_memory(args):
         return f"Error: unknown action '{action}' (use read/write/append)"
 
 
+# ── git ────────────────────────────────────────────────────────────────
+
+def tool_git_status(args):
+    try:
+        r = subprocess.run(
+            ["git", "status", "--short", "--branch"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            cwd=WORKDIR,
+        )
+        out = (r.stdout or "") + (f"\n[stderr]\n{r.stderr}" if r.stderr else "")
+        if r.returncode != 0:
+            return truncate(out.strip() or "Error: git status failed")
+        return truncate(out.strip() or "Working tree clean")
+    except FileNotFoundError:
+        return "Error: git is not installed"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def tool_git_diff(args):
+    path = args.get("path")
+    staged = args.get("staged", False)
+
+    cmd = ["git", "diff"]
+    if staged:
+        cmd.append("--staged")
+    if path:
+        cmd.extend(["--", path])
+
+    try:
+        r = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            cwd=WORKDIR,
+        )
+        out = (r.stdout or "") + (f"\n[stderr]\n{r.stderr}" if r.stderr else "")
+        if r.returncode != 0:
+            return truncate(out.strip() or "Error: git diff failed")
+        return truncate(out.strip() or "No diff")
+    except FileNotFoundError:
+        return "Error: git is not installed"
+    except Exception as e:
+        return f"Error: {e}"
+
+
 # ── tool registry ──────────────────────────────────────────────────────
 
 TOOLS = {
@@ -249,6 +375,7 @@ TOOLS = {
                 "properties": {
                     "command": {"type": "string", "description": "The shell command to run"},
                     "timeout": {"type": "integer", "description": "Timeout in seconds (max 120)", "default": 30},
+                    "confirm_dangerous": {"type": "boolean", "description": "Ask for confirmation before running a caution command", "default": False},
                 },
                 "required": ["command"],
             },
@@ -371,6 +498,31 @@ TOOLS = {
                     "content": {"type": "string", "description": "Content for write/append"},
                 },
                 "required": ["action"],
+            },
+        },
+    },
+    "git_status": {
+        "fn": tool_git_status,
+        "schema": {
+            "name": "git_status",
+            "description": "Show git status (modified, added, deleted files).",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
+    "git_diff": {
+        "fn": tool_git_diff,
+        "schema": {
+            "name": "git_diff",
+            "description": "Show git diff for a file or all changes.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path (omit for all changes)"},
+                    "staged": {"type": "boolean", "description": "Show staged changes", "default": False},
+                },
             },
         },
     },

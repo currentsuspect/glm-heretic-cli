@@ -5,6 +5,8 @@ import time
 import readline
 from llama_cpp import Llama
 from huggingface_hub import hf_hub_download
+from glm_context import detect_repo_context
+from glm_runtime import load_llm
 
 REPO = "DavidAU/GLM-4.7-Flash-Uncensored-Heretic-NEO-CODE-Imatrix-MAX-GGUF"
 FILE = "GLM-4.7-Flash-Uncen-Hrt-NEO-CODE-MAX-imat-D_AU-Q4_K_M.gguf"
@@ -20,6 +22,7 @@ GREEN = "\033[32m"
 YELLOW = "\033[33m"
 CYAN  = "\033[36m"
 WHITE = "\033[97m"
+BLUE  = "\033[34m"
 BOLD = B
 DIM = D
 ITAL = I
@@ -38,9 +41,29 @@ def spinner(msg="Loading"):
         idx += 1
 
 
+def render_panel(title, lines, accent=CYAN):
+    width = 64
+    title_text = f" {title} "
+    rule = "─" * max(0, width - len(title_text))
+    print(f"  {accent}{B}{title_text}{rule}{R}")
+    for line in lines:
+        print(f"  {GRAY}  {line}{R}")
+    print()
+
+
+def repo_summary(cwd):
+    repo = detect_repo_context(cwd)
+    lines = [cwd]
+    if repo["facts"]:
+        lines.extend(repo["facts"][:4])
+    else:
+        lines.append("No repo bootstrap hints detected")
+    return lines
+
+
 def load_model():
     sys.stderr.write(f"\n  {B}{CYAN}GLM-4.7-Flash Heretic{R} {D}Q4_K_M{R}\n")
-    sys.stderr.write(f"  {D}30B MoE · 4 experts · 200K ctx{R}\n\n")
+    sys.stderr.write(f"  {D}30B MoE · 4 experts · 200K ctx · local CLI{R}\n\n")
     sys.stderr.flush()
 
     spin = spinner("Downloading model...")
@@ -50,12 +73,18 @@ def load_model():
     clear_line()
     sys.stderr.write(f"  {GREEN}✓{R} {GRAY}Downloaded{R}\n")
 
-    spin = spinner("Loading GPU...")
+    spin = spinner("Loading backend...")
     sys.stderr.write(next(spin) + "\r")
     sys.stderr.flush()
-    llm = Llama(model_path=model_path, n_ctx=4096, n_gpu_layers=-1, verbose=False)
+    try:
+        llm, backend_note = load_llm(model_path=model_path, n_ctx=4096, verbose=False)
+    except Exception as e:
+        clear_line()
+        sys.stderr.write(f"  {RED}✗{R} {GRAY}{e}{R}\n\n")
+        sys.stderr.flush()
+        raise SystemExit(1)
     clear_line()
-    sys.stderr.write(f"  {GREEN}✓{R} {GRAY}GPU ready{R}\n")
+    sys.stderr.write(f"  {GREEN}✓{R} {GRAY}{backend_note}{R}\n")
 
     spin = spinner("Warmup...")
     sys.stderr.write(next(spin) + "\r")
@@ -217,8 +246,14 @@ def main():
         return
 
     # interactive
-    print(f"  {B}{CYAN}GLM-4.7-Flash Heretic{R} {D}Q4_K_M · 30B MoE{R}")
-    print(f"  {GRAY}  {B}/help{R}{GRAY} for commands · {B}Ctrl+C{R}{GRAY} exit{R}\n")
+    render_panel(
+        "GLM-4.7 Flash Heretic",
+        [
+            "Q4_K_M | 30B MoE | local GPU chat",
+            "Use /help for commands",
+        ],
+    )
+    render_panel("Workspace", repo_summary(os.getcwd()), accent=BLUE)
 
     while True:
         try:
