@@ -1,0 +1,63 @@
+#!/bin/bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+
+echo "[1/4] compile"
+python3 -m py_compile \
+  "$ROOT/src/glm_cli/agent.py" \
+  "$ROOT/src/glm_cli/chat.py" \
+  "$ROOT/src/glm_cli/context.py" \
+  "$ROOT/src/glm_cli/install.py" \
+  "$ROOT/src/glm_cli/runtime.py" \
+  "$ROOT/src/glm_cli/server.py" \
+  "$ROOT/src/glm_cli/tools.py"
+
+echo "[2/4] parser"
+python3 - <<'PY'
+from glm_cli.agent import parse_tool_calls
+
+valid = '```json\n{"name":"shell","arguments":{"command":"pwd"}}\n```'
+invalid = '```json\n{"name":"shell","arguments":{}}\n```'
+assert parse_tool_calls(valid) == [{"name": "shell", "arguments": {"command": "pwd"}}]
+assert parse_tool_calls(invalid) == []
+print("parser ok")
+PY
+
+echo "[3/4] patch"
+tmp="$(mktemp /tmp/glm-loop-XXXX.txt)"
+printf 'alpha\nbeta\ngamma\n' > "$tmp"
+python3 - <<'PY' "$tmp"
+import sys
+from glm_cli.tools import tool_patch
+
+path = sys.argv[1]
+result = tool_patch({
+    "path": path,
+    "operations": [
+        {"op": "replace", "old_string": "beta", "new_string": "beta-2"},
+        {"op": "insert_after", "anchor": "gamma", "text": "\nomega"},
+    ],
+})
+assert "beta-2" in result and "omega" in result
+print("patch ok")
+PY
+rm -f "$tmp"
+
+echo "[4/4] bootstrap"
+tmpdir="$(mktemp -d /tmp/glm-bootstrap-XXXX)"
+cat > "$tmpdir/package.json" <<'EOF'
+{"scripts":{"test":"vitest","lint":"eslint .","build":"vite build"}}
+EOF
+python3 - <<'PY' "$tmpdir"
+import sys
+from glm_cli.context import detect_repo_context
+repo = detect_repo_context(sys.argv[1])
+labels = {item["label"] for item in repo["commands"]}
+assert {"test", "lint", "build"}.issubset(labels)
+print("bootstrap ok")
+PY
+rm -rf "$tmpdir"
+
+echo "all loops passed"

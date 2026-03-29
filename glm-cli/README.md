@@ -101,6 +101,9 @@ glm --serve
 
 # API server
 ./glm --serve
+
+# local smoke loops
+./glm-cli/scripts/test-loops
 ```
 
 ## Requirements

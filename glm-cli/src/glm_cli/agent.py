@@ -107,10 +107,13 @@ def create_execution_state():
     return {
         "made_changes": False,
         "verified": False,
+        "verification_failed": False,
+        "verification_failures": 0,
         "verification_prompted": False,
         "risky_paths": set(),
         "reviewed_paths": set(),
         "review_prompted": False,
+        "retry_prompted": False,
     }
 
 
@@ -122,6 +125,11 @@ def verification_hint(cwd):
     if repo["commands"]:
         return f"Run `{repo['commands'][0]['command']}` or another targeted check before finalizing."
     return "Run a relevant shell check or inspect the diff before finalizing."
+
+
+def retry_hint(state, cwd):
+    base = verification_hint(cwd)
+    return f"A verification step has failed {state['verification_failures']} time(s). Inspect the failure, fix the issue, and rerun checks. {base}"
 
 
 def review_hint(state):
@@ -194,6 +202,10 @@ def update_execution_state(state, name, args, result):
     ]):
         if "[exit code:" not in result:
             state["verified"] = True
+            state["verification_failed"] = False
+        else:
+            state["verification_failed"] = True
+            state["verification_failures"] += 1
 
     if any(token in cmd for token in ["mkdir", "touch", "cp ", "mv ", "npm install", "pip install"]):
         state["made_changes"] = True
@@ -456,6 +468,15 @@ def agent_loop(llm, user_msg, messages, temperature=0.7):
                     "content": "You made risky changes. Review them with git_diff before giving the final answer.",
                 })
                 state["review_prompted"] = True
+                continue
+            if state["verification_failed"] and not state["retry_prompted"]:
+                render_panel("Retry", [retry_hint(state, os.getcwd())], accent=RED)
+                messages.append({"role": "assistant", "content": resp})
+                messages.append({
+                    "role": "user",
+                    "content": "A verification step failed. Inspect the failure, make the needed fix, and rerun verification before giving the final answer.",
+                })
+                state["retry_prompted"] = True
                 continue
             if state["made_changes"] and not state["verified"] and not state["verification_prompted"]:
                 render_panel("Verify", [verification_hint(os.getcwd())], accent=RED)
